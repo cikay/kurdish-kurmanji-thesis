@@ -120,6 +120,8 @@ class ThesisParser:
 
 
 class PdfDownloader:
+    _KEY_RE = re.compile(r"TezGoster\?key=([^'\"]+)")
+
     def __init__(self, client: HttpClient):
         self._client = client
 
@@ -127,6 +129,12 @@ class PdfDownloader:
         return f"{BASE_URL}/getTezPdf.jsp?kayitNo={thesis.kayit_no}&tezNo={thesis.tez_no}"
 
     def download_bytes(self, thesis: Thesis) -> bytes | None:
+        key = self._resolve_key(thesis)
+        if key is None:
+            return None
+        return self._fetch_pdf(key, thesis.tez_id)
+
+    def _resolve_key(self, thesis: Thesis) -> str | None:
         r = self._client.get(
             "getTezPdf.jsp",
             params={"kayitNo": thesis.kayit_no, "tezNo": thesis.tez_no},
@@ -134,18 +142,27 @@ class PdfDownloader:
                 "Referer": f"{BASE_URL}/tezSorguSonucYeni.jsp",
                 "X-Requested-With": "XMLHttpRequest",
             },
+        )
+        m = self._KEY_RE.search(r.text)
+        if not m:
+            print(f"  Key not found ({thesis.tez_id}): {r.text[:80]}")
+            return None
+        return m.group(1)
+
+    def _fetch_pdf(self, key: str, tez_id: str) -> bytes | None:
+        r = self._client.get(
+            "TezGoster",
+            params={"key": key},
+            headers={"Referer": f"{BASE_URL}/tezSorguSonucYeni.jsp"},
             stream=True,
         )
         r.raw.decode_content = False
         if r.status_code != 200:
-            print(f"  PDF fetch failed ({thesis.tez_id}): {r.status_code}")
+            print(f"  PDF fetch failed ({tez_id}): {r.status_code}")
             return None
-        return self._stream_bytes(r, thesis.tez_id)
-
-    def _stream_bytes(self, response: requests.Response, tez_id: str) -> bytes | None:
         try:
             chunks = []
-            while chunk := response.raw.read(1024 * 1024):
+            while chunk := r.raw.read(1024 * 1024):
                 chunks.append(chunk)
             return b"".join(chunks)
         except Exception as e:
