@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pyyaml = "==6.0.3"
+requests = "==2.34.2"
+beautifulsoup4 = "==4.14.3"
+pypdf2 = "==3.0.1"
+lxml = "==6.1.1"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"

@@ -1,0 +1,6 @@
+stages:
+  - download
+
+
+download:
+  description: Search YÖK Tez Merkezi, download PDFs, write downloads/manifest.jsonl
