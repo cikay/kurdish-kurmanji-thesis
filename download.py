@@ -2,7 +2,7 @@
 manifest.jsonl for downstream stages."""
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import requests
@@ -17,20 +17,12 @@ BASE_URL = "https://tez.yok.gov.tr/UlusalTezMerkezi"
 
 
 
-@dataclass
-class Config:
-    downloads_dir: Path = field(default_factory=lambda: Path("data/download"))
-    language: str = "11"      # 11=Kurdish; leave "" for any language
-    headers: dict = field(default_factory=lambda: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
-        "sec-ch-ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-    })
-
-    @property
-    def manifest_file(self) -> Path:
-        return self.downloads_dir / "manifest.jsonl"
+_DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    "sec-ch-ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+}
 
 
 
@@ -68,9 +60,9 @@ class TezSearcher:
     }
     _RESULTS_HEADERS = {"referer": f"{BASE_URL}/tarama.jsp"}
 
-    def __init__(self, client: HttpClient, config: Config):
+    def __init__(self, client: HttpClient, language: str):
         self._client = client
-        self._config = config
+        self._language = language
 
     def search(self) -> str:
         self._client.get("tarama.jsp")
@@ -81,7 +73,7 @@ class TezSearcher:
         payload = (
             f"uniad=&Universite=&uni_yoksis_id=&source=TR&ensad=&Enstitu=0"
             f"&abdad=&ABD=0&Konu=&Tur=0&yil1=0&yil2=0&izin=0&Durum=3"
-            f"&TezAd=&Dil={self._config.language}&AdSoyad=&DanismanAdSoyad="
+            f"&TezAd=&Dil={self._language}&AdSoyad=&DanismanAdSoyad="
             f"&Dizin=&TezNo=&islem=2&Bolum=0&-find=++Bul"
         )
         r = self._client.post("SearchTez", headers=self._SEARCH_HEADERS, data=payload)
@@ -194,38 +186,37 @@ class ManifestWriter:
 class TezScraper(Stage):
     name = "download"
 
-    def __init__(self, config: Config | None = None):
-        self._config = config or Config()
-        client = HttpClient(self._config.headers)
-        self._searcher = TezSearcher(client, self._config)
+    def __init__(self, language: str = "11"):
+        client = HttpClient(_DEFAULT_HEADERS)
+        self._searcher = TezSearcher(client, language)
         self._parser = ThesisParser()
         self._downloader = PdfDownloader(client)
 
-    def run(self) -> None:
+    def run(self, input_dir: Path | None, output_dir: Path) -> None:
         html = self._searcher.search()
         theses = self._parser.parse(html)
         print(f"Found {len(theses)} theses")
 
-        self._config.downloads_dir.mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
         saved = 0
 
-        with ManifestWriter(self._config.manifest_file) as manifest:
+        with ManifestWriter(output_dir / "manifest.jsonl") as manifest:
             for i, thesis in enumerate(theses, 1):
-                if self._process(thesis, manifest):
+                if self._process(thesis, manifest, output_dir):
                     saved += 1
                 print(f"  [{i}/{len(theses)}] downloaded: {saved}", end="\r")
 
-        print(f"\nDone — {saved}/{len(theses)} PDFs saved to {self._config.downloads_dir}/")
+        print(f"\nDone — {saved}/{len(theses)} PDFs saved to {output_dir}/")
 
-    def _process(self, thesis: Thesis, manifest: ManifestWriter) -> bool:
+    def _process(self, thesis: Thesis, manifest: ManifestWriter, output_dir: Path) -> bool:
         pdf_bytes = self._downloader.download_bytes(thesis)
         if pdf_bytes is None:
             return False
-        pdf_file = self._config.downloads_dir / f"{thesis.tez_id}.pdf"
+        pdf_file = output_dir / f"{thesis.tez_id}.pdf"
         pdf_file.write_bytes(pdf_bytes)
         manifest.write(thesis, self._downloader.pdf_url(thesis), str(pdf_file))
         return True
 
 
 if __name__ == "__main__":
-    TezScraper().run()
+    TezScraper().run(None, Path("data/download"))
