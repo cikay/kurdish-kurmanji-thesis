@@ -3,6 +3,8 @@ stages:
   - extract
   - normalize
   - clean
+  - stats
+  - filter
 
 download:
   description: Search YÖK Tez Merkezi, download PDFs, write manifest.jsonl
@@ -15,3 +17,10 @@ normalize:
 
 clean:
   description: Filter to Kurmanji-only paragraphs, write theses_clean.csv
+
+stats:
+  description: Compute per-thesis word counts, write manifest.jsonl
+
+filter:
+  description: Discard theses below minimum word count, write manifest.jsonl
+  min_word_count: 100

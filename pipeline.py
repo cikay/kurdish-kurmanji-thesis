@@ -8,14 +8,18 @@ import yaml
 from clean import CleanStage
 from download import TezScraper
 from extract import ExtractStage
+from filter import FilterStage
 from normalize import NormalizeStage
 from stage import Stage
+from stats import StatsStage
 
 REGISTRY: dict[str, type[Stage]] = {
     "download": TezScraper,
     "extract": ExtractStage,
     "normalize": NormalizeStage,
     "clean": CleanStage,
+    "stats": StatsStage,
+    "filter": FilterStage,
 }
 
 
@@ -66,7 +70,8 @@ def main() -> None:
     data_root = Path("data")
 
     for cfg in stage_cfgs:
-        stage: Stage = REGISTRY[cfg["name"]]()
+        kwargs = {k: v for k, v in cfg.items() if k not in ("name", "description")}
+        stage: Stage = REGISTRY[cfg["name"]](**kwargs)
         output_dir = data_root / stage.name
         prev_idx = stage_names.index(stage.name) - 1
         input_dir = data_root / stage_names[prev_idx] if prev_idx >= 0 else None
