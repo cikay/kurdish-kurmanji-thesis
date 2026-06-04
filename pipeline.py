@@ -5,12 +5,17 @@ from pathlib import Path
 
 import yaml
 
+from clean import CleanStage
 from download import TezScraper
+from extract import ExtractStage
+from normalize import NormalizeStage
 from stage import Stage
 
 REGISTRY: dict[str, type[Stage]] = {
     "download": TezScraper,
-
+    "extract": ExtractStage,
+    "normalize": NormalizeStage,
+    "clean": CleanStage,
 }
 
 
@@ -58,10 +63,15 @@ def main() -> None:
             sys.exit(1)
         stage_cfgs = stage_cfgs[stage_names.index(args.start_from):]
 
+    data_root = Path("data")
+
     for cfg in stage_cfgs:
         stage: Stage = REGISTRY[cfg["name"]]()
+        output_dir = data_root / stage.name
+        prev_idx = stage_names.index(stage.name) - 1
+        input_dir = data_root / stage_names[prev_idx] if prev_idx >= 0 else None
         print(f"\n=== Stage: {stage.name} — {cfg['description']} ===")
-        stage.run()
+        stage.run(input_dir=input_dir, output_dir=output_dir)
 
     print("\nPipeline complete.")
 

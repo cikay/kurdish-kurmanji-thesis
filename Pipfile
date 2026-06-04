@@ -9,6 +9,7 @@ requests = "==2.34.2"
 beautifulsoup4 = "==4.14.3"
 lxml = "==6.1.1"
 fasttext = "==0.9.3"
+numpy = "<2"
 huggingface-hub = "==1.17.0"
 pymupdf = "==1.27.2.3"
 

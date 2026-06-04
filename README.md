@@ -1,14 +1,17 @@
 # Kurdish Kurmanji Thesis Pipeline
 
-Scrapes Kurdish-language theses from [YÖK Ulusal Tez Merkezi](https://tez.yok.gov.tr), extracts their text, and filters them for downstream use.
+Scrapes Kurdish-language theses from [YÖK Ulusal Tez Merkezi](https://tez.yok.gov.tr), extracts and normalizes their text, filters to Kurmanji-only content, and prepares it for publishing to Hugging Face.
 
 ## Pipeline stages
 
 | Stage | Script | Input | Output |
 |---|---|---|---|
-| `download` | `download.py` | — | `downloads/manifest.jsonl`, `downloads/<no>.pdf` |
-| `split` | `split.py` | `downloads/manifest.jsonl` | `theses.csv` |
-| `filter` | `filter.py` | `theses.csv` | `theses_filtered.csv` |
+| `download` | `download.py` | — | `data/download/*.pdf`, `manifest.jsonl` |
+| `extract` | `extract.py` | `data/download/manifest.jsonl` | `data/extract/*.txt`, `manifest.jsonl` |
+| `normalize` | `normalize.py` | `data/extract/manifest.jsonl` | `data/normalize/theses.csv` |
+| `clean` | `clean.py` | `data/normalize/theses.csv` | `data/clean/theses.csv` |
+
+Each stage writes its output to `data/{stage_name}/` and receives the previous stage's directory as input. No paths are hardcoded in stage classes.
 
 ## Usage
 
@@ -17,10 +20,10 @@ Scrapes Kurdish-language theses from [YÖK Ulusal Tez Merkezi](https://tez.yok.g
 python pipeline.py
 
 # Start from a specific stage (skips earlier stages)
-python pipeline.py --start-from split
+python pipeline.py --start-from extract
 
 # Run a single stage only
-python pipeline.py --only filter
+python pipeline.py --only normalize
 
 # Use a custom config file
 python pipeline.py --config my_config.yml
@@ -29,20 +32,21 @@ python pipeline.py --config my_config.yml
 ## Installation
 
 ```bash
-pip install requests beautifulsoup4 lxml PyPDF2 pyyaml
+pipenv install
 ```
 
 ## Adding a stage
 
-1. Create a new script with a class that extends `Stage` from `stage.py`:
+1. Create a class extending `Stage` from `stage.py`:
 
 ```python
+from pathlib import Path
 from stage import Stage
 
 class MyStage(Stage):
     name = "my_stage"
 
-    def run(self) -> None:
+    def run(self, input_dir: Path | None, output_dir: Path) -> None:
         ...
 ```
 
@@ -55,7 +59,7 @@ REGISTRY: dict[str, type[Stage]] = {
 }
 ```
 
-3. Add it to `pipeline.yml`:
+3. Add it to `config.yml`:
 
 ```yaml
 stages:
@@ -65,3 +69,5 @@ stages:
 my_stage:
   description: What this stage does
 ```
+
+The pipeline automatically passes `data/{prev_stage_name}` as `input_dir` and `data/my_stage` as `output_dir`.

@@ -1,6 +1,17 @@
 stages:
   - download
-
+  - extract
+  - normalize
+  - clean
 
 download:
-  description: Search YÖK Tez Merkezi, download PDFs, write downloads/manifest.jsonl
+  description: Search YÖK Tez Merkezi, download PDFs, write manifest.jsonl
+
+extract:
+  description: Extract plain text from PDFs, write txt files and manifest.jsonl
+
+normalize:
+  description: Normalize text to NFC, write theses_normalized.csv
+
+clean:
+  description: Filter to Kurmanji-only paragraphs, write theses_clean.csv
