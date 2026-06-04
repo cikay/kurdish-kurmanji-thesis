@@ -11,6 +11,8 @@ lxml = "==6.1.1"
 fasttext = "==0.9.3"
 numpy = "<2"
 huggingface-hub = "==1.17.0"
+datasets = "==4.8.5"
+python-dotenv = "==1.2.2"
 pymupdf = "==1.27.2.3"
 
 [dev-packages]
