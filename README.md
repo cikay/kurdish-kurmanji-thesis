@@ -2,18 +2,11 @@
 
 Scrapes Kurdish-language theses from [YÖK Ulusal Tez Merkezi](https://tez.yok.gov.tr), extracts and normalizes their text, filters to Kurmanji-only content, and publishes it to Hugging Face.
 
-## Pipeline stages
+## Installation
 
-| Stage | Script | Input | Output |
-|---|---|---|---|
-| `download` | `download.py` | — | `data/download/*.pdf`, `manifest.jsonl` |
-| `extract` | `extract.py` | `data/download/manifest.jsonl` | `data/extract/*.txt`, `manifest.jsonl` |
-| `normalize` | `normalize.py` | `data/extract/manifest.jsonl` | `data/normalize/theses.csv` |
-| `clean` | `clean.py` | `data/normalize/theses.csv` | `data/clean/*.txt`, `manifest.jsonl` |
-| `stats` | `stats.py` | `data/clean/manifest.jsonl` | `data/stats/manifest.jsonl` (adds `word_count`) |
-| `filter` | `filter.py` | `data/stats/manifest.jsonl` | `data/filter/manifest.jsonl` (drops below `min_word_count`) |
-
-Each stage writes its output to `data/{stage_name}/` and receives the previous stage's directory as input. No paths are hardcoded in stage classes.
+```bash
+pipenv install
+```
 
 ## Usage
 
@@ -29,6 +22,28 @@ python pipeline.py --only filter
 
 # Use a custom config file
 python pipeline.py --config my_config.yml
+```
+
+## Pipeline stages
+
+| Stage | Script | Input | Output |
+|---|---|---|---|
+| `download` | `download.py` | — | `data/download/*.pdf`, `manifest.jsonl` |
+| `extract` | `extract.py` | `data/download/manifest.jsonl` | `data/extract/*.txt`, `manifest.jsonl` |
+| `normalize` | `normalize.py` | `data/extract/manifest.jsonl` | `data/normalize/theses.csv` |
+| `clean` | `clean.py` | `data/normalize/theses.csv` | `data/clean/*.txt`, `manifest.jsonl` |
+| `stats` | `stats.py` | `data/clean/manifest.jsonl` | `data/stats/manifest.jsonl` (adds `word_count`) |
+| `filter` | `filter.py` | `data/stats/manifest.jsonl` | `data/filter/manifest.jsonl` (drops below `min_word_count`) |
+
+Each stage writes its output to `data/{stage_name}/` and receives the previous stage's directory as input.
+
+## Configuration
+
+Stage parameters are defined in `config.yml`. The `filter` stage exposes `min_word_count`:
+
+```yaml
+filter:
+  min_word_count: 100
 ```
 
 ## Publishing to Hugging Face
@@ -51,22 +66,9 @@ python push_to_hub.py --repo username/kurdish-kurmanji-theses --private
 
 The script uploads the dataset as Parquet (usable via `datasets.load_dataset()`) and pushes `dataset_card.md` as the repository README.
 
-## Configuration
+## Contributing
 
-Stage parameters are defined in `config.yml`. The `filter` stage exposes `min_word_count`:
-
-```yaml
-filter:
-  min_word_count: 100
-```
-
-## Installation
-
-```bash
-pipenv install
-```
-
-## Adding a stage
+### Adding a stage
 
 1. Create a class extending `Stage` from `stage.py`:
 
