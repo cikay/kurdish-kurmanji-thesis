@@ -1,0 +1,5 @@
+=== 593743 — Di el-Kelîmatu'l-Qîsara Baba Tahirê Hemedanî da taybetmendên îrfanî
+tur_Latn: no summary — no heading found
+block 0: dropped — tur_Latn (p=0.99), 122 words: ''
+block 2572: dropped — kiu_Latn (p=0.68), 1073 words: 'ÇAVKANÎ'
+block 2714: dropped — 17 words: 'PÊVEK'

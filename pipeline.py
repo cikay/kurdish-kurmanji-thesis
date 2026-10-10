@@ -5,19 +5,18 @@ from pathlib import Path
 
 import yaml
 
-from clean import CleanStage
+import logs
 from download import TezScraper
 from extract import ExtractStage
 from filter import FilterStage
-from normalize import NormalizeStage
-from stage import Stage
+from sections import SectionsStage
+from stage import Stage, stage_config
 from stats import StatsStage
 
 REGISTRY: dict[str, type[Stage]] = {
     "download": TezScraper,
     "extract": ExtractStage,
-    "normalize": NormalizeStage,
-    "clean": CleanStage,
+    "sections": SectionsStage,
     "stats": StatsStage,
     "filter": FilterStage,
 }
@@ -45,9 +44,16 @@ def main() -> None:
         "--config",
         default="config.yml",
         metavar="FILE",
-        help="Path to the pipeline YAML config (default: pipeline.yml).",
+        help="Path to the pipeline YAML config (default: config.yml).",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Also log the successes, e.g. every section that was kept.",
     )
     args = parser.parse_args()
+
+    logs.configure(args.debug)
 
     if args.start_from and args.only:
         print("Error: --start-from and --only are mutually exclusive.")
@@ -70,8 +76,7 @@ def main() -> None:
     data_root = Path("data")
 
     for cfg in stage_cfgs:
-        kwargs = {k: v for k, v in cfg.items() if k not in ("name", "description")}
-        stage: Stage = REGISTRY[cfg["name"]](**kwargs)
+        stage: Stage = REGISTRY[cfg["name"]](**stage_config(cfg["name"], Path(args.config)))
         output_dir = data_root / stage.name
         prev_idx = stage_names.index(stage.name) - 1
         input_dir = data_root / stage_names[prev_idx] if prev_idx >= 0 else None

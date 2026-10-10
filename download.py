@@ -74,7 +74,7 @@ class TezSearcher:
             f"uniad=&Universite=&uni_yoksis_id=&source=TR&ensad=&Enstitu=0"
             f"&abdad=&ABD=0&Konu=&Tur=0&yil1=0&yil2=0&izin=0&Durum=3"
             f"&TezAd=&Dil={self._language}&AdSoyad=&DanismanAdSoyad="
-            f"&Dizin=&TezNo=&islem=2&Bolum=0&-find=++Bul"
+            f"&Dizin=&TezNo=&Metin=&islem=2&Bolum=0&-find=++Bul"
         )
         r = self._client.post("SearchTez", headers=self._SEARCH_HEADERS, data=payload)
         print(f"[1] SearchTez: {r.status_code} → {r.url.split('/')[-1]}")

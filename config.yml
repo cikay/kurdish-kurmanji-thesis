@@ -1,8 +1,7 @@
 stages:
   - download
   - extract
-  - normalize
-  - clean
+  - sections
   - stats
   - filter
 
@@ -10,17 +9,90 @@ download:
   description: Search YÖK Tez Merkezi, download PDFs, write manifest.jsonl
 
 extract:
-  description: Extract plain text from PDFs, write txt files and manifest.jsonl
+  description: Read each PDF's structure with MinerU, NFC-normalized
+  # Run the stage over these theses only, by tez_id — MinerU reads about 0.45 pages a
+  # second, so a full corpus pass is measured in tens of hours and is not something to
+  # start by accident. Empty list means every thesis.
+  #
+  # The six below are the ones worth looking at first. The first two are why the pipeline
+  # moved to MinerU at all, and the next two are what the move costs:
+  #   532507  94 scanned pages; the old PyMuPDF extract got 63 words for the whole thesis
+  #   706158  broken font cmap; extracted as `TEZA /Ì6$16$%ø/ø1'`, unreadable
+  #   447830  MinerU merges KURTE into the title block above it — summary lost
+  #   887531  the same, for both KURTE and ÖZET
+  #   465880  clean scan the old split found no summaries in; MinerU finds all three
+  #   1003999 an ordinary thesis, as a control
+  # only_theses:
+    # - "443622"
+    # - "443619"
+    # - "443622"
+    # - "458830"
+    # - "458844"
+    # - "922785"
+    # - "383854"
+    # - "458834"
+    # - "532507"
+    # - "706158"
+    # - "447830"
+    # - "887531"
+    # - "465880"
+    # - "1003999"
+  # How much work MinerU does per page. `basic` is the layout-plus-OCR path — the nearest
+  # thing to the `pipeline` backend of MinerU 3, and what this corpus runs on: it read the
+  # 94 scanned pages of `532507` in 323s, where 3.4.5 took 318s. `flash` reads less per
+  # page. `standard` and `advanced` add a local vision model: two minutes to load before
+  # the first page, and a per-page cost 73,604 pages cannot afford.
+  tier: basic
+  # `auto` lets MinerU choose per page between reading the text layer and OCRing the
+  # rendering. OCRing is what rescues the scanned front matter.
+  ocr_mode: auto
+  # How many pages MinerU may hold in flight (MINERU_PROCESSING_WINDOW_SIZE). Its own
+  # default is 64, and at 64 a document needing more than one window dies on 16GB of
+  # unified memory — `532507`, 94 scanned pages, failed after the first window with an
+  # empty error and a leaked-semaphore warning. The corpus averages 175 pages a thesis,
+  # so the default would fail on nearly all of it. Raise this if you have more memory.
+  processing_window_size: 16
 
-normalize:
-  description: Normalize text to NFC, write theses_normalized.csv
-
-clean:
-  description: Filter to Kurmanji-only paragraphs, write theses_clean.csv
+sections:
+  description: Read the blocks, take the summaries, keep the Kurdish rest as text
+  # Run the stage over these theses only, by tez_id. For trying a knob or a rule against
+  # one thesis instead of waiting out the whole corpus. Empty list means every thesis.
+  # only_theses: []
+  # A summary heading is followed by the thesis title, the author, the university and a
+  # page count before the abstract itself, and MinerU marks several of those as headings.
+  # Under this many words a summary is still on its title page, so a heading arriving is
+  # more of that page rather than the end of the summary. Measured over the sample the two
+  # cases are far apart — furniture headings arrive with 0-2 words in the summary, real
+  # boundaries with 143 or more — so this is the middle of a wide gap, not a tuned number.
+  summary_min_words_before_heading: 50
+  # A section GlotLID labels none of Kurmanji, Zazaki and Sorani is dropped from `text` —
+  # unless it has fewer words than this, where the label is noise and it is kept: under 10
+  # words GlotLID calls 83% of the sections in Kurmanji theses something else, under 20
+  # words 76%, and from 20 to 50 words 24%.
+  min_words_for_lang_detect: 50
 
 stats:
   description: Compute per-thesis word counts, write manifest.jsonl
 
 filter:
-  description: Discard theses below minimum word count, write manifest.jsonl
-  min_word_count: 100
+  description: Discard theses too short or not in a wanted language, write manifest.jsonl
+  min_word_count: 1000
+  # The GlotLID label of a thesis's whole text, and the language it is filed under
+  # (`text_lang` in the manifest, and the dataset subset). Any other label drops the thesis.
+  # No score is read: the lowest Kurmanji one measured was 0.77.
+  #
+  # Zazaki comes back under two labels, and GlotLID does not split the theses between them
+  # reliably, so both go to `zza_Latn`. Sorani is `ckb_Arab` alone, the four theses that
+  # extract clean.
+  #
+  # `hac_Arab` is GlotLID's code for Gurani, but the six theses it names are not Gurani:
+  # they are Sorani and Kurmanji theses printed in old fonts, and their text extracts with
+  # the letters mapped wrong (`ثەسچبٚ دەکەٚێذ`). They are kept under their own label so
+  # they stay apart from the clean Sorani. `knc_Arab` and `arz_Arab` are the same damage
+  # under other names, and are dropped.
+  text_langs:
+    kmr_Latn: kmr_Latn
+    kiu_Latn: zza_Latn
+    diq_Latn: zza_Latn
+    ckb_Arab: ckb_Arab
+    hac_Arab: hac_Arab
