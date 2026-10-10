@@ -9,14 +9,15 @@ requests = "==2.34.2"
 beautifulsoup4 = "==4.14.3"
 lxml = "==6.1.1"
 fasttext = "==0.9.3"
-numpy = "<2"
 huggingface-hub = "==1.17.0"
 datasets = "==4.8.5"
 python-dotenv = "==1.2.2"
 pymupdf = "==1.27.2.3"
+mineru = "==4.0.10"
 
 [dev-packages]
 pytest = "==9.0.3"
+modal = "==1.6.1"
 
 [requires]
 python_version = "3.13"

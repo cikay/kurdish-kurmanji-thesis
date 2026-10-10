@@ -7,12 +7,14 @@ import os
 import sys
 from pathlib import Path
 
-from datasets import Dataset
+from datasets import Dataset, Features, Value
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
 from huggingface_hub.utils import RepositoryNotFoundError
 
-load_dotenv()
+from sections import SUMMARY_LANGUAGES
+
+load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +24,44 @@ def load_records(manifest_path: Path) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
-def build_dataset(records: list[dict]) -> Dataset:
-    rows = []
+# Stated rather than inferred: a subset where no thesis has a summary in some language
+# would otherwise type that key `null`, and the subsets would not share a schema.
+FEATURES = Features(
+    {
+        "tez_id": Value("string"),
+        "title": Value("string"),
+        "url": Value("string"),
+        "word_count": Value("int64"),
+        "text": Value("string"),
+        "summaries": {lang: Value("string") for lang in SUMMARY_LANGUAGES},
+    }
+)
+
+
+def build_datasets(records: list[dict]) -> dict[str, Dataset]:
+    """One dataset per language a thesis is written in — the subsets of the repo.
+
+    `text_lang` is written by the filter stage: `kmr_Latn`, `zza_Latn` or `ckb_Arab`.
+    `summaries` has the same keys in every row, `null` where a thesis has no summary in
+    that language, because a dict column needs one shape.
+    """
+    rows: dict[str, list[dict]] = {}
     for record in records:
         text = Path(record["txt_file"]).read_text(encoding="utf-8")
-        rows.append(
+        rows.setdefault(record["text_lang"], []).append(
             {
                 "tez_id": record["tez_id"],
                 "title": record["title"],
                 "url": record["url"],
-                "word_count": record["word_count"],
+                "word_count": record["thesis_word_count"],
                 "text": text,
+                "summaries": record["summaries"],
             }
         )
-    return Dataset.from_list(rows)
+    return {
+        lang: Dataset.from_list(lang_rows, features=FEATURES)
+        for lang, lang_rows in sorted(rows.items())
+    }
 
 
 def check_repo_does_not_exist(repo_id: str, token: str) -> None:
@@ -80,11 +106,13 @@ def main() -> None:
     records = load_records(Path(args.manifest))
     logger.info("Loaded %d records from %s", len(records), args.manifest)
 
-    ds = build_dataset(records)
-    logger.info("Dataset ready — %d rows, columns: %s", len(ds), ds.column_names)
+    datasets = build_datasets(records)
+    for lang, ds in datasets.items():
+        logger.info("Subset %s ready — %d rows, columns: %s", lang, len(ds), ds.column_names)
 
-    logger.info("Pushing dataset to %s (private=%s)...", args.repo, args.private)
-    ds.push_to_hub(args.repo, token=token, private=args.private)
+    for lang, ds in datasets.items():
+        logger.info("Pushing subset %s to %s (private=%s)...", lang, args.repo, args.private)
+        ds.push_to_hub(args.repo, config_name=lang, token=token, private=args.private)
 
     logger.info("Done — https://huggingface.co/datasets/%s", args.repo)
 

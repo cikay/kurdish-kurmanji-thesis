@@ -21,7 +21,7 @@ class StatsStage(Stage):
                 word_count = len(text.split())
                 mf.write(
                     json.dumps(
-                        {**record, "word_count": word_count},
+                        {**record, "thesis_word_count": word_count},
                         ensure_ascii=False,
                     )
                     + "\n"
@@ -37,4 +37,4 @@ class StatsStage(Stage):
 
 if __name__ == "__main__":
     stage = StatsStage()
-    stage.run(Path("data/clean"), Path("data/stats"))
+    stage.run(Path("data/sections"), Path("data/stats"))
